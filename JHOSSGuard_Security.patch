@@ -1,0 +1,18 @@
+# JHOSSGuard Security Patch
+
+🔒 **Critical Security Patch for Android**
+
+This repository contains the **JHOSSGuard Security Patch**, developed to fix a vulnerability related to privilege escalation in the authentication module.
+
+## 📌 Description
+The patch strengthens access validation and prevents malicious actors from exploiting weak privilege checks.
+
+- ✅ Prevents unauthorized privilege escalation  
+- ✅ Improves authentication module security  
+- ✅ Adds extra validation layers for sensitive processes  
+
+## 🛠️ Installation
+1. Download the patch file: `JHOSSGuard_Security.patch`  
+2. Apply it with Git:  
+   ```bash
+   git apply JHOSSGuard_Security.patch
