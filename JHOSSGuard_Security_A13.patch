@@ -1,0 +1,44 @@
+From 2c8c4b6 Mon Sep 17 00:00:00 2001
+From: JHOSSGuard <security@jhossguard.org>
+Date: Fri, 5 Sep 2025 10:00:00 +0000
+Subject: [PATCH][Android 13+] JHOSSGuard – Privilege Escalation Guard in AMS + SELinux Hardening
+
+--- a/frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
++++ b/frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
+@@
+ public class ActivityManagerService extends IActivityManager.Stub {
+
++    /**
++     * JHOSSGuard security check: Prevent unauthorized privilege escalation attempts
++     */
++    private void enforceNoPrivilegeEscalationLocked(int callingUid, String action) {
++        final int userId = UserHandle.getUserId(callingUid);
++        if (userId != UserHandle.USER_SYSTEM) {
++            if (!checkCallingPermission(android.Manifest.permission.INTERACT_ACROSS_USERS_FULL)) {
++                Slog.w("JHOSSGuard", "Blocked unauthorized cross-user or privilege escalation: "
++                        + action + " by UID=" + callingUid);
++                throw new SecurityException("Privilege escalation attempt detected: " + action);
++            }
++        }
++    }
++
+     // Example sensitive call
+     public ComponentName startService(IApplicationThread caller, Intent service,
+             String resolvedType, boolean requireForeground, String callingPackage,
+             int userId) {
++        enforceNoPrivilegeEscalationLocked(Binder.getCallingUid(), service != null ? service.getAction() : "null");
+         // original logic continues…
+     }
+--- /dev/null
++++ b/system/sepolicy/private/jhossguard.te
+@@
++# JHOSSGuard SELinux hardening rules for Android 13+
++
++# Block apps from resolving sensitive system services
++neverallow {
++  appdomain
++} system_server:service_manager find
++    [ "activity" "package" "usagestats" "batterystats" "procstats" ];
++
++# Block apps from adding new services to system_server
++neverallow appdomain system_server:service_manager add;
