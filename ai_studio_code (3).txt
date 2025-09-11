@@ -1,0 +1,46 @@
+# [MITIGACIÓN CÓDIGO 004] Hardening de SELinux para el Subsistema de Entrada
+
+## Objetivo
+Restringir estrictamente el acceso a los dispositivos de entrada y las llamadas `ioctl` relacionadas, incluso para procesos con privilegios elevados.
+
+## Especificaciones de Política de SELinux
+1.  **Restricción de Acceso a Dispositivos de Entrada:**
+    -   Denegar explícitamente el acceso de escritura (`write`) y `ioctl` a los dispositivos `/dev/input/event*` para la mayoría de los dominios de procesos de usuario.
+    -   Solo permitir acceso a dominios de procesos de confianza (ej. `input_manager_service`, `system_server`, `input_hal`) que son responsables de manejar la entrada del usuario.
+
+    ```selinux
+    # Denegar escritura y ioctl a dispositivos de entrada por defecto
+    neverallow { domain } input_device:chr_file { write ioctl };
+
+    # Permitir acceso solo a dominios de confianza
+    allow system_server input_device:chr_file { read write ioctl };
+    allow input_hal input_device:chr_file { read write ioctl };
+    # ... otros servicios legítimos que necesiten interactuar con input_device
+    ```
+
+2.  **Restricción de Llamadas `ioctl` a Controladores:**
+    -   Identificar las llamadas `ioctl` críticas utilizadas por los controladores del panel táctil (ej. para inyección de eventos, configuración de modos).
+    -   Crear tipos de `ioctl` específicos y denegar su uso a dominios no autorizados.
+
+    ```selinux
+    # Ejemplo: Denegar llamadas ioctl específicas para inyección de eventos a dominios no autorizados
+    # (Esto requiere conocer los números ioctl específicos del controlador)
+    # type_transition domain input_device:chr_file ioctl_cmd_inject_event;
+    # neverallow { domain -trusted_input_domain } input_device:chr_file ioctl_cmd_inject_event;
+    ```
+
+3.  **Restricción de Carga de Módulos del Kernel:**
+    -   Denegar a todos los dominios de usuario la capacidad de cargar o descargar módulos del kernel (`module_load`, `module_unload`).
+    -   Solo permitir que el `init` o el `kernel` carguen módulos firmados y verificados durante el arranque.
+
+    ```selinux
+    neverallow { domain } kernel:module { load unload };
+    allow kernel self:module { load unload }; # Solo el kernel puede gestionar sus módulos
+    ```
+
+4.  **Monitoreo de Denegaciones (Audit2Allow):**
+    -   Utilizar `audit2allow` durante el desarrollo para identificar y refinar las políticas, asegurándose de que las operaciones legítimas no sean bloqueadas, mientras que las maliciosas sí lo sean.
+
+## Pruebas de Verificación
+-   Intentar usar `adb shell sendevent` desde un proceso de usuario sin privilegios y verificar que es denegado por SELinux.
+-   Intentar cargar un módulo de kernel no firmado desde un proceso con root (pero sin el contexto SELinux adecuado) y verificar que es denegado.

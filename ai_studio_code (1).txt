@@ -1,0 +1,25 @@
+# [MITIGACIÓN CÓDIGO 002] Implementación de Runtime Integrity Monitoring (RIM) en TEE
+
+## Objetivo
+Detectar y responder a modificaciones no autorizadas en la memoria del kernel, especialmente en los controladores de entrada, durante la ejecución del sistema operativo.
+
+## Requisitos de Hardware/Firmware
+-   **Trusted Execution Environment (TEE):** El SoC debe soportar un TEE funcional (ej. TrustZone) con la capacidad de ejecutar Trusted Applications (TAs).
+-   **Acceso a Memoria Segura:** El TEE debe tener acceso seguro y privilegiado a la memoria RAM del sistema para realizar lecturas sin interferencia del kernel normal.
+
+## Especificaciones de Trusted Application (TA)
+1.  **TA de Monitoreo de Integridad:** Desarrollar una TA residente en el TEE que:
+    -   **Mapeo de Regiones Críticas:** Conozca las direcciones de memoria y tamaños de las regiones críticas del kernel a monitorear (ej. código del controlador del panel táctil, tablas de llamadas al sistema, módulos de entrada). Estas direcciones deben ser obtenidas de forma segura durante el arranque verificado.
+    -   **Hashing Periódico:** Realice periódicamente (ej. cada 100ms, configurable) un cálculo de hash (ej. SHA256) de estas regiones de memoria.
+    -   **Comparación de Hashes:** Compare los hashes calculados con un conjunto de hashes de referencia "conocidos como buenos", almacenados de forma segura en el TEE (establecidos durante el arranque verificado).
+2.  **Manejo de Detección de Compromiso:**
+    -   Si un hash calculado no coincide con el de referencia, la TA debe considerar el kernel comprometido.
+    -   **Acciones de Respuesta (definidas por política):**
+        -   **Reinicio Forzado:** Iniciar un reinicio seguro del dispositivo.
+        -   **Modo de Recuperación:** Forzar la entrada en un modo de recuperación seguro.
+        -   **Notificación al Kernel:** Enviar una señal de "compromiso" al kernel normal (a través de una interfaz segura) para que pueda tomar acciones (ej. deshabilitar interfaces críticas, registrar el evento).
+        -   **Bloqueo de Hardware:** Deshabilitar directamente el controlador del panel táctil o el subsistema de entrada a través de una interfaz segura con el TEE.
+    -   **Registro Seguro:** Registrar el evento de compromiso en un log inmutable dentro del TEE.
+
+## Interfaz Kernel-TEE
+-   Definir una interfaz segura (ej. a través de `smc` calls) para que el kernel pueda consultar el estado de integridad del TEE o para que el TEE pueda notificar al kernel de un compromiso.

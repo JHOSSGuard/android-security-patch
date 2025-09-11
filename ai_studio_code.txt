@@ -1,0 +1,33 @@
+# [MITIGACIÓN CÓDIGO 001] Implementación de Hardware-backed Verified Boot (HBVB)
+
+## Objetivo
+Garantizar que el dispositivo solo arranque software autorizado y no modificado, desde el Root of Trust (RoT) de hardware.
+
+## Requisitos de Hardware
+- **RoT Inmutable:** El SoC debe incluir una ROM de arranque inmutable que contenga la clave pública del OEM o un hash de la misma.
+- **Mecanismo de Verificación Criptográfica:** El hardware debe ser capaz de realizar verificaciones de firma digital (ej. RSA, ECDSA) de forma eficiente.
+
+## Especificaciones de Firmware (Bootloader)
+1.  **Verificación de la Cadena de Confianza:**
+    -   El bootloader primario (cargado por el RoT) debe verificar criptográficamente la integridad y autenticidad del bootloader secundario.
+    -   El bootloader secundario debe verificar criptográficamente la imagen del kernel (`boot.img`), la partición `dtb` (Device Tree Blob) y la partición `vbmeta`.
+    -   `vbmeta` debe contener los hashes o firmas de todas las particiones críticas (ej. `system`, `vendor`, `product`, `odm`).
+2.  **Protección Anti-Rollback:**
+    -   Implementar contadores de versión seguros (protegidos por hardware o TEE) para `vbmeta` y las imágenes del sistema.
+    -   El bootloader debe rechazar el arranque de versiones de software anteriores a la última versión segura conocida.
+3.  **Manejo de Fallos de Verificación:**
+    -   Si cualquier etapa de la verificación falla, el dispositivo **NO DEBE** arrancar el sistema operativo.
+    -   Debe mostrar una advertencia clara al usuario (ej. pantalla de "dispositivo comprometido") y/o entrar en un modo de recuperación seguro y limitado.
+    -   **NO** debe permitir la ejecución de código no verificado o modificado.
+4.  **Bloqueo del Bootloader:**
+    -   Por defecto, el bootloader debe estar bloqueado en dispositivos de producción.
+    -   Si el bootloader se desbloquea, el estado de Verified Boot debe cambiar a un estado "desbloqueado" (ej. `ORANGE` en Android), y el usuario debe ser advertido explícitamente en cada arranque. La atestación de claves debe reflejar este estado.
+
+## Configuración del Kernel
+-   **`CONFIG_ANDROID_VERIFIED_BOOT`:** Habilitado y configurado para trabajar con el bootloader.
+-   **`dm-verity`:** Configurado para verificar la integridad de las particiones de solo lectura (`/system`, `/vendor`, etc.) en tiempo de ejecución, utilizando los hashes proporcionados por `vbmeta`.
+
+## Pruebas de Verificación
+-   Intentar flashear una imagen de kernel modificada y verificar que el dispositivo no arranca.
+-   Intentar flashear una partición `vbmeta` con hashes incorrectos y verificar que el dispositivo no arranca.
+-   Verificar que la atestación de claves refleja correctamente el estado de arranque (bloqueado/desbloqueado, verificado/no verificado).
