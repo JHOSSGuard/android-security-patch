@@ -1,0 +1,37 @@
+# [MITIGACIÓN CÓDIGO 003] Firmware de Controlador Táctil Seguro con Atestación de Hardware
+
+## Objetivo
+Garantizar que solo los eventos táctiles generados físicamente por el usuario sean procesados por el sistema, detectando y descartando eventos inyectados por software.
+
+## Requisitos de Hardware
+-   **Controlador de Panel Táctil (Touch Controller):** El chip del controlador táctil debe tener:
+    -   **Memoria de Solo Lectura (ROM):** Para almacenar un firmware de arranque inmutable que verifique la integridad del firmware principal.
+    -   **Motor Criptográfico Ligero:** Capaz de generar firmas o MACs (Message Authentication Codes) de forma eficiente.
+    -   **Comunicación Segura con SoC/TEE:** Un canal de comunicación (ej. I2C, SPI) que pueda ser protegido contra eavesdropping y manipulación.
+
+## Especificaciones de Firmware del Controlador Táctil
+1.  **Arranque Verificado del Firmware:**
+    -   El firmware de arranque en ROM debe verificar criptográficamente la integridad y autenticidad del firmware principal del controlador antes de ejecutarlo.
+    -   Cualquier fallo de verificación debe dejar el controlador en un estado inoperable o de "solo lectura".
+2.  **Generación de Firma de Evento Táctil (Hardware Touch Event Signature):**
+    -   Para cada evento táctil detectado físicamente por el hardware del panel táctil, el firmware del controlador debe calcular una firma criptográfica (ej. HMAC-SHA256) utilizando una clave secreta única para el dispositivo (provisionada de forma segura en el hardware).
+    -   La firma debe incluir datos relevantes del evento (coordenadas X/Y, presión, ID de toque, timestamp).
+    -   El evento táctil, junto con su firma, debe ser enviado al kernel.
+3.  **Protección contra Inyección Directa:**
+    -   El firmware debe implementar mecanismos para ignorar o rechazar comandos de inyección de eventos táctiles provenientes de interfaces que no sean el propio sensor táctil.
+
+## Modificaciones del Kernel (Subsistema de Entrada)
+1.  **Módulo de Kernel de Entrada Segura:**
+    -   Modificar el controlador de entrada del kernel (ej. `input_event.c` o el driver específico del panel táctil) para que espere y valide la firma de hardware en cada evento táctil recibido.
+    -   **Validación de Firma:** Para cada `input_event` de tipo `EV_ABS` o `EV_KEY` proveniente del panel táctil:
+        -   Extraer la firma adjunta al evento.
+        -   Verificar la firma utilizando la clave pública correspondiente (o un MAC key si es un mecanismo interno del SoC).
+    -   **Manejo de Eventos Inválidos:**
+        -   Si la firma es inválida o está ausente, el evento **DEBE SER DESCARTADO** y no inyectado en la cola de eventos del sistema.
+        -   Se debe registrar un evento de seguridad crítico (ej. en `dmesg`, `logcat`) indicando un intento de inyección de eventos táctiles.
+        -   Opcionalmente, se puede notificar al TEE para una respuesta más severa.
+
+## Pruebas de Verificación
+-   Utilizar herramientas de inyección de eventos táctiles a nivel de software (ej. `sendevent` de `adb`, o un exploit de kernel) y verificar que los eventos no son procesados por el sistema.
+-   Verificar que los logs de seguridad registran los intentos de inyección.
+-   Asegurar que los toques físicos normales funcionan sin latencia o errores.
