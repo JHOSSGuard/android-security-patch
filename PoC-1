@@ -1,0 +1,40 @@
+Pasos para reproducir
+Dispositivo 1 – Vivo V30 5G Lite
+Sistema operativo: Android 15
+Construir huella digital:vivo/v30lite/V2329A:15/AP1A.240726.046/202408221532:usuario/teclas de liberación.
+
+Proceso de reproducción:
+
+Instalar APK malicioso con exploit de escalada de privilegios.
+El malware escribe en particiones protegidas ( /system, /vendor).
+Realizar restablecimiento de fábrica a través de configuración → El malware persiste.
+Realizar restablecimiento de fábrica en modo de recuperación → El malware persiste nuevamente.
+El cargador de arranque acepta vbmeta modificado y particiones manipuladas.
+El dispositivo arranca normalmente, el malware permanece activo.
+Prueba de concepto (PoC)
+Fase 1: Escalada y persistencia de privilegios
+APK ejecuta el exploit del kernel.
+Escribe ganchos en /system, gana supervivencia después de los borrados.
+Fase 2: Omisión de arranque verificada
+El atacante reemplaza vbmeta con un árbol hash falsificado.
+Una falla del cargador de arranque acepta metadatos comprometidos.
+El sistema arranca con particiones inyectadas con malware.
+Fase 3 – Operaciones encubiertas
+Abusa de las API de accesibilidad para la inyección de entradas ocultas.
+Utiliza SpeechRecognizer para activadores de comando y control.
+Omite MediaProjection para duplicar silenciosamente la pantalla/audio.
+Material de apoyo / Referencias
+CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H
+Especifique la huella digital de compilación del dispositivo utilizado para reproducir el problema. El problema debería reproducirse en una compilación reciente (de los últimos 30 días).
+vivo/v30lite/V2329A:15/AP1A.240726.046/202408221532:usuario/teclas de liberación.
+
+Proporcionar artefactos de fallas, incluido el seguimiento de la pila (si está disponible).
+Adjunto los artefactos recolectados durante la validación:
+
+dmesg de arranque → Verified Boot reporta green, sin errores, a pesar de particiones alteradas.
+logcat en boot inicial → sin detección de dm-verity.
+Atestación de clave JSON → verifiedBootState=GREEN, bootloaderLocked=true.
+Captura de persistencia → paquete malicioso aún presente tras factory reset.
+OTA logs (/cache/recovery/last_log) → actualización rechazada, inconsistencia no detectada en arranque.
+Hashes de particiones (system, vendor) → divergencia tras reset.
+No se generó stack trace por crash; el fallo se manifiesta como bypass silencioso de Verified Boot
